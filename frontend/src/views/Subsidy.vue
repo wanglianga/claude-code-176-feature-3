@@ -1,5 +1,11 @@
 <template>
   <div class="page-container">
+    <el-alert type="info" :closable="false" style="margin-bottom:10px"
+      title="合作门店配镜补助须先在「发放核验」完成材料核验（处方/镜片参数/付款凭证/取镜签收）后再发放；退镜换片差额与不适调整也在「发放核验」处理。">
+      <template #default>
+        <el-button size="small" type="primary" plain @click="$router.push('/dispense')">前往发放核验</el-button>
+      </template>
+    </el-alert>
     <el-card>
       <el-tabs v-model="tab">
         <el-tab-pane label="补助申请与核准" name="apply">

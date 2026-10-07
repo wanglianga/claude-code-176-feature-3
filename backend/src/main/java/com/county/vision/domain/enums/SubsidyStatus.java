@@ -10,7 +10,8 @@ public enum SubsidyStatus {
     APPROVED("已核准发放"),
     REJECTED("争议驳回"),
     DISPUTE("争议复核中"),
-    PAID("补助已发放");
+    PAID("补助已发放"),
+    RECOVERED("补助已追回");
 
     private final String label;
 

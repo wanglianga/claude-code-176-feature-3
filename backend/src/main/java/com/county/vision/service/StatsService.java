@@ -30,6 +30,8 @@ public class StatsService {
     private final SubsidyApplicationRepository subsidyRepo;
     private final IssueTrackerRepository issueRepo;
     private final SchoolRepository schoolRepo;
+    private final StoreDispenseRepository dispenseRepo;
+    private final AfterSalesRepository afterSalesRepo;
     private final CacheService cache;
 
     @PersistenceContext
@@ -38,7 +40,8 @@ public class StatsService {
     public StatsService(StudentRepository studentRepo, ScreenRecordRepository screenRepo,
                         VisitRecordRepository visitRepo, GlassesRecordRepository glassesRepo,
                         SubsidyApplicationRepository subsidyRepo, IssueTrackerRepository issueRepo,
-                        SchoolRepository schoolRepo, CacheService cache) {
+                        SchoolRepository schoolRepo, StoreDispenseRepository dispenseRepo,
+                        AfterSalesRepository afterSalesRepo, CacheService cache) {
         this.studentRepo = studentRepo;
         this.screenRepo = screenRepo;
         this.visitRepo = visitRepo;
@@ -46,6 +49,8 @@ public class StatsService {
         this.subsidyRepo = subsidyRepo;
         this.issueRepo = issueRepo;
         this.schoolRepo = schoolRepo;
+        this.dispenseRepo = dispenseRepo;
+        this.afterSalesRepo = afterSalesRepo;
         this.cache = cache;
     }
 
@@ -95,6 +100,13 @@ public class StatsService {
                 com.county.vision.domain.enums.SubsidyStatus.PAID));
         m.put("subsidyDispute", subsidyRepo.countByStatus(
                 com.county.vision.domain.enums.SubsidyStatus.DISPUTE));
+        // 门店配镜核验：挂起待更正 / 核验通过待发放 / 售后待结算或待调整
+        m.put("dispenseSuspended", dispenseRepo.countByStatus(
+                com.county.vision.domain.enums.DispenseStatus.SUSPENDED));
+        m.put("dispensePassed", dispenseRepo.countByStatus(
+                com.county.vision.domain.enums.DispenseStatus.PASSED));
+        m.put("afterSalesOpen", afterSalesRepo.countByStatus("PENDING_SETTLE")
+                + afterSalesRepo.countByStatus("WAIT_ADJUST"));
 
         cache.put(cacheKey, m, Duration.ofSeconds(30));
         return m;

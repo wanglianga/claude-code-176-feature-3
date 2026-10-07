@@ -5,6 +5,8 @@ import com.county.vision.domain.enums.Role;
 import com.county.vision.domain.enums.ScreenFlag;
 import com.county.vision.domain.repository.*;
 import com.county.vision.dto.RecordDtos;
+import com.county.vision.dto.VerifyDtos;
+import com.county.vision.service.DispenseVerifyService;
 import com.county.vision.service.FlowService;
 import com.county.vision.service.TimelineService;
 import lombok.extern.slf4j.Slf4j;
@@ -38,12 +40,13 @@ public class DataSeeder implements ApplicationRunner {
     private final PasswordEncoder encoder;
     private final FlowService flow;
     private final TimelineService timeline;
+    private final DispenseVerifyService verify;
 
     public DataSeeder(UserAccountRepository userRepo, RegionRepository regionRepo,
                       SchoolRepository schoolRepo, GradeClassRepository classRepo,
                       StudentRepository studentRepo, IssueTrackerRepository issueRepo,
                       PasswordEncoder encoder,
-                      FlowService flow, TimelineService timeline) {
+                      FlowService flow, TimelineService timeline, DispenseVerifyService verify) {
         this.userRepo = userRepo;
         this.regionRepo = regionRepo;
         this.schoolRepo = schoolRepo;
@@ -53,6 +56,7 @@ public class DataSeeder implements ApplicationRunner {
         this.encoder = encoder;
         this.flow = flow;
         this.timeline = timeline;
+        this.verify = verify;
     }
 
     @Override
@@ -79,6 +83,7 @@ public class DataSeeder implements ApplicationRunner {
         account("screener", pwd, "县视光中心-筛查队", Role.SCREEN_ORG, null, "阳光县视光中心", "13900000004");
         account("hospital", pwd, "县人民医院-眼科", Role.HOSPITAL, null, "阳光县人民医院眼科", "13900000005");
         account("clinic", pwd, "爱眼合作眼科门诊", Role.CLINIC, null, "爱眼眼科门诊", "13900000006");
+        account("store", pwd, "阳光眼镜合作门店-验配部", Role.CLINIC, null, "阳光眼镜合作门店", "13900000007");
         account("parent", pwd, "张爸爸", Role.PARENT, null, null, "13800001111");
 
         int year = LocalDate.now().getYear();
@@ -296,7 +301,149 @@ public class DataSeeder implements ApplicationRunner {
                 true, new BigDecimal("540.00"), "1.56镜片", false, null));
         flow.addIntervention(intervention(han.getId(), "PARENT_REMIND", d(2026, 10, 6), "提醒家长督促每日2小时户外活动"));
 
-        log.info("种子数据初始化完成：3 个片区、4 所学校、10 个角色账号、16 名学生场景样例（含 3 个已闭环样例）");
+        /* ================= 合作门店配镜补助发放核验场景 ================= */
+
+        // ---- 17. 门店核验通过、补助已发放（林涛，五年级1班）----
+        Student lin = student(s1, grade(s1, "五年级", "1班"), "2024050117", "林涛", "男",
+                LocalDate.of(2013, 5, 6), "林妈妈", "13800010777", null, year);
+        flow.submitScreen(screen(lin.getId(), "4.6", "4.7", "-1.50", "-1.25", "-0.50", "-0.50",
+                false, "作业时间长", false, null, d(2026, 9, 22)));
+        flow.schoolReview(review(lin.getId(), "CONFIRM", "确认异常"));
+        flow.notifyParent(notify(lin.getId(), "短信", false, null));
+        flow.parentChoice(choice(lin.getId(), "PARTNER_CLINIC", "爱眼眼科门诊", null, null));
+        flow.submitVisit(visit(lin.getId(), "爱眼眼科门诊", "陈医生", d(2026, 9, 28),
+                true, false, "-1.50", "-1.25", "-0.50", "-0.50", "180", "175", "59",
+                "双眼真性近视", 6, true, false, null));
+        GlassesRecord linG = flow.submitGlasses(glasses(lin.getId(), "阳光眼镜合作门店", d(2026, 10, 2),
+                true, new BigDecimal("680.00"), "1.60防蓝光非球面镜片", false, null));
+        Long linD = verify.submit(dispense(lin.getId(), linG.getId(),
+                "-1.50", "-1.25", "-0.50", "-0.50", "180", "175", "59",
+                "1.60防蓝光非球面", "480.00", "200.00", "PAY-2026-10001", d(2026, 10, 5), "林妈妈")).getId();
+        verify.pay(linD);
+
+        // ---- 18. 付款凭证重复 → 核验挂起（周杰，八年级1班）----
+        Student zhouJ = student(s3, grade(s3, "八年级", "1班"), "2023080118", "周杰", "男",
+                LocalDate.of(2011, 9, 15), "周爸爸", "13800010888", null, year);
+        flow.submitScreen(screen(zhouJ.getId(), "4.5", "4.6", "-2.00", "-1.75", "-0.25", "-0.25",
+                false, "电子产品使用偏多", false, null, d(2026, 9, 24)));
+        flow.schoolReview(review(zhouJ.getId(), "CONFIRM", "确认异常"));
+        flow.notifyParent(notify(zhouJ.getId(), "电话", false, null));
+        flow.parentChoice(choice(zhouJ.getId(), "COUNTY_HOSPITAL", "阳光县人民医院眼科", null, null));
+        flow.submitVisit(visit(zhouJ.getId(), "阳光县人民医院眼科", "刘医生", d(2026, 9, 30),
+                true, true, "-2.00", "-1.75", "-0.25", "-0.25", "180", "180", "61",
+                "双眼中度近视", 6, true, false, null));
+        GlassesRecord zhouG = flow.submitGlasses(glasses(zhouJ.getId(), "阳光眼镜合作门店", d(2026, 10, 4),
+                true, new BigDecimal("720.00"), "1.60镜片", false, null));
+        // 门店误用林涛的付款凭证号上传 → 平台核验挂起
+        verify.submit(dispense(zhouJ.getId(), zhouG.getId(),
+                "-2.00", "-1.75", "-0.25", "-0.25", "180", "180", "61",
+                "1.60非球面", "520.00", "200.00", "PAY-2026-10001", d(2026, 10, 6), "周爸爸"));
+
+        // ---- 19. 门店重复提交同一副眼镜 → 挂起并拦截重复发放（郑凯，四年级2班）----
+        Student zhengK = student(s1, grade(s1, "四年级", "2班"), "2024040219", "郑凯", "男",
+                LocalDate.of(2013, 8, 21), "郑妈妈", "13800010999", null, year);
+        flow.submitScreen(screen(zhengK.getId(), "4.7", "4.8", "-1.25", "-1.00", null, null,
+                false, "户外活动不足", false, null, d(2026, 9, 23)));
+        flow.schoolReview(review(zhengK.getId(), "CONFIRM", "确认异常"));
+        flow.notifyParent(notify(zhengK.getId(), "APP", false, null));
+        flow.parentChoice(choice(zhengK.getId(), "PARTNER_CLINIC", "爱眼眼科门诊", null, null));
+        flow.submitVisit(visit(zhengK.getId(), "爱眼眼科门诊", "陈医生", d(2026, 9, 29),
+                true, false, "-1.25", "-1.00", null, null, null, null, "58",
+                "双眼低度近视", 6, true, false, null));
+        GlassesRecord zhengG = flow.submitGlasses(glasses(zhengK.getId(), "阳光眼镜合作门店", d(2026, 10, 3),
+                true, new BigDecimal("560.00"), "1.56树脂片", false, null));
+        Long zhengD = verify.submit(dispense(zhengK.getId(), zhengG.getId(),
+                "-1.25", "-1.00", null, null, null, null, "58",
+                "1.56树脂片", "400.00", "160.00", "PAY-2026-10003", d(2026, 10, 5), "郑妈妈")).getId();
+        verify.pay(zhengD);
+        // 门店就同一副眼镜再次提交 → 挂起，补助不会发第二次
+        verify.submit(dispense(zhengK.getId(), zhengG.getId(),
+                "-1.25", "-1.00", null, null, null, null, "58",
+                "1.56树脂片", "400.00", "160.00", "PAY-2026-10003B", d(2026, 10, 6), "郑妈妈"));
+
+        // ---- 20. 退镜 → 差额追回已结算（孙悦，高一1班）----
+        Student sunY = student(s4, grade(s4, "高一", "1班"), "2021100120", "孙悦", "女",
+                LocalDate.of(2009, 4, 18), "孙妈妈", "13800011000", "初中起近视", year);
+        flow.submitScreen(screen(sunY.getId(), "4.4", "4.5", "-2.50", "-2.25", "-0.50", "-0.75",
+                true, "已戴旧镜", false, null, d(2026, 9, 21)));
+        flow.schoolReview(review(sunY.getId(), "CONFIRM", "确认异常"));
+        flow.notifyParent(notify(sunY.getId(), "短信", false, null));
+        flow.parentChoice(choice(sunY.getId(), "COUNTY_HOSPITAL", "阳光县人民医院眼科", null, null));
+        flow.submitVisit(visit(sunY.getId(), "阳光县人民医院眼科", "吴医生", d(2026, 9, 27),
+                true, true, "-2.50", "-2.25", "-0.50", "-0.75", "180", "180", "60",
+                "双眼中度近视，重新配镜", 6, true, false, null));
+        GlassesRecord sunG = flow.submitGlasses(glasses(sunY.getId(), "阳光眼镜合作门店", d(2026, 10, 1),
+                true, new BigDecimal("680.00"), "1.60镜片", false, null));
+        Long sunD = verify.submit(dispense(sunY.getId(), sunG.getId(),
+                "-2.50", "-2.25", "-0.50", "-0.75", "180", "180", "60",
+                "1.60非球面", "480.00", "200.00", "PAY-2026-10004", d(2026, 10, 3), "孙妈妈")).getId();
+        verify.pay(sunD);
+        Long sunAs = verify.registerAfterSales(afterSales(sunD, "RETURN",
+                "家长对镜片效果不满意，与门店协商退镜", "680.00", null)).getId();
+        verify.settle(sunAs);
+
+        // ---- 21. 换片 → 应补发差额待结算（钱进，六年级1班）----
+        Student qian = student(s2, grade(s2, "六年级", "1班"), "2022060121", "钱进", "男",
+                LocalDate.of(2012, 7, 9), "钱爸爸", "13800011111", null, year);
+        flow.submitScreen(screen(qian.getId(), "4.6", "4.7", "-1.75", "-1.50", "-0.25", "-0.25",
+                false, "用眼习惯一般", false, null, d(2026, 9, 22)));
+        flow.schoolReview(review(qian.getId(), "CONFIRM", "确认异常"));
+        flow.notifyParent(notify(qian.getId(), "电话", false, null));
+        flow.parentChoice(choice(qian.getId(), "PARTNER_CLINIC", "爱眼眼科门诊", null, null));
+        flow.submitVisit(visit(qian.getId(), "爱眼眼科门诊", "陈医生", d(2026, 9, 28),
+                true, false, "-1.75", "-1.50", "-0.25", "-0.25", "175", "180", "58",
+                "双眼低度近视", 6, true, false, null));
+        GlassesRecord qianG = flow.submitGlasses(glasses(qian.getId(), "阳光眼镜合作门店", d(2026, 10, 2),
+                true, new BigDecimal("560.00"), "1.56树脂片", false, null));
+        Long qianD = verify.submit(dispense(qian.getId(), qianG.getId(),
+                "-1.75", "-1.50", "-0.25", "-0.25", "175", "180", "58",
+                "1.56树脂片", "400.00", "160.00", "PAY-2026-10005", d(2026, 10, 4), "钱爸爸")).getId();
+        verify.pay(qianD);
+        // 镜片刮花更换防蓝光镜片，新费用 760 元 → 应补发 20 元，待卫健结算
+        verify.registerAfterSales(afterSales(qianD, "LENS_CHANGE",
+                "镜片刮花，更换1.60防蓝光镜片", "0.00", "760.00"));
+
+        // ---- 22. 不适反馈已调整，适应回访提醒中（李欣，三年级1班）----
+        Student liX = student(s1, grade(s1, "三年级", "1班"), "2024030122", "李欣", "女",
+                LocalDate.of(2014, 10, 12), "李妈妈", "13800011222", null, year);
+        flow.submitScreen(screen(liX.getId(), "4.7", "4.8", "-1.00", "-0.75", null, null,
+                false, "读写姿势不规范", false, null, d(2026, 9, 23)));
+        flow.schoolReview(review(liX.getId(), "CONFIRM", "确认异常"));
+        flow.notifyParent(notify(liX.getId(), "短信", false, null));
+        flow.parentChoice(choice(liX.getId(), "PARTNER_CLINIC", "爱眼眼科门诊", null, null));
+        flow.submitVisit(visit(liX.getId(), "爱眼眼科门诊", "陈医生", d(2026, 9, 29),
+                true, false, "-1.00", "-0.75", null, null, null, null, "57",
+                "双眼低度近视", 6, true, false, null));
+        GlassesRecord liXG = flow.submitGlasses(glasses(liX.getId(), "阳光眼镜合作门店", d(2026, 10, 3),
+                true, new BigDecimal("540.00"), "1.56树脂片", false, null));
+        Long liXD = verify.submit(dispense(liX.getId(), liXG.getId(),
+                "-1.00", "-0.75", null, null, null, null, "57",
+                "1.56树脂片", "380.00", "160.00", "PAY-2026-10006", d(2026, 10, 5), "李妈妈")).getId();
+        verify.pay(liXD);
+        Long liXAs = verify.feedback(feedback(liXD, "戴镜头晕、看近疲劳")).getId();
+        verify.uploadAdjustResult(liXAs, "复查光度无误，调整鼻托与镜架倾角后佩戴适应良好");
+
+        // ---- 23. 不适反馈待门店调整（吴忧，五年级1班）----
+        Student wuY = student(s2, grade(s2, "五年级", "1班"), "2022050123", "吴忧", "女",
+                LocalDate.of(2013, 3, 27), "吴妈妈", "13800011333", null, year);
+        flow.submitScreen(screen(wuY.getId(), "4.6", "4.6", "-1.50", "-1.25", "-0.25", "-0.25",
+                false, "每日近距离用眼约4小时", false, null, d(2026, 9, 24)));
+        flow.schoolReview(review(wuY.getId(), "CONFIRM", "确认异常"));
+        flow.notifyParent(notify(wuY.getId(), "APP", false, null));
+        flow.parentChoice(choice(wuY.getId(), "PARTNER_CLINIC", "爱眼眼科门诊", null, null));
+        flow.submitVisit(visit(wuY.getId(), "爱眼眼科门诊", "陈医生", d(2026, 9, 30),
+                true, false, "-1.50", "-1.25", "-0.25", "-0.25", "180", "180", "58",
+                "双眼低度近视", 6, true, false, null));
+        GlassesRecord wuG = flow.submitGlasses(glasses(wuY.getId(), "阳光眼镜合作门店", d(2026, 10, 4),
+                true, new BigDecimal("600.00"), "1.56树脂片", false, null));
+        Long wuD = verify.submit(dispense(wuY.getId(), wuG.getId(),
+                "-1.50", "-1.25", "-0.25", "-0.25", "180", "180", "58",
+                "1.56树脂片", "420.00", "180.00", "PAY-2026-10007", d(2026, 10, 6), "吴妈妈")).getId();
+        verify.pay(wuD);
+        verify.feedback(feedback(wuD, "镜架夹头、看不清黑板"));
+
+        log.info("种子数据初始化完成：3 个片区、4 所学校、11 个角色账号、23 名学生场景样例"
+                + "（含门店核验通过/挂起、退镜追回、换片补差、不适调整与适应回访场景）");
     }
 
     /** 闭环某学生当前未处理的指定类型异常事项 */
@@ -443,6 +590,51 @@ public class DataSeeder implements ApplicationRunner {
         i.setContent(content);
         i.setExecuted(true);
         return i;
+    }
+
+    /** 门店核验材料：处方与复诊一致、材料齐全、凭证唯一 → 核验通过 */
+    private VerifyDtos.DispenseSubmitRequest dispense(Long sid, Long gid, String sl, String sr,
+                                                      String cl, String cr, String al, String ar, String pd,
+                                                      String lensParams, String lensAmt, String frameAmt,
+                                                      String voucher, LocalDate pickupDate, String signer) {
+        VerifyDtos.DispenseSubmitRequest r = new VerifyDtos.DispenseSubmitRequest();
+        r.setStudentId(sid);
+        r.setGlassesId(gid);
+        r.setStoreName("阳光眼镜合作门店");
+        r.setRxSphereLeft(sl);
+        r.setRxSphereRight(sr);
+        r.setRxCylinderLeft(cl);
+        r.setRxCylinderRight(cr);
+        r.setRxAxisLeft(al);
+        r.setRxAxisRight(ar);
+        r.setPd(pd);
+        r.setLensParams(lensParams);
+        r.setLensAmount(new BigDecimal(lensAmt));
+        r.setFrameAmount(new BigDecimal(frameAmt));
+        r.setTotalAmount(new BigDecimal(lensAmt).add(new BigDecimal(frameAmt)));
+        r.setPaymentVoucherNo(voucher);
+        r.setPickupSigned(true);
+        r.setPickupDate(pickupDate);
+        r.setPickupSigner(signer);
+        return r;
+    }
+
+    private VerifyDtos.AfterSalesRequest afterSales(Long dispenseId, String type,
+                                                    String reason, String refund, String newAmount) {
+        VerifyDtos.AfterSalesRequest r = new VerifyDtos.AfterSalesRequest();
+        r.setDispenseId(dispenseId);
+        r.setType(type);
+        r.setReason(reason);
+        r.setRefundAmount(refund == null ? null : new BigDecimal(refund));
+        r.setNewAmount(newAmount == null ? null : new BigDecimal(newAmount));
+        return r;
+    }
+
+    private VerifyDtos.FeedbackRequest feedback(Long dispenseId, String text) {
+        VerifyDtos.FeedbackRequest r = new VerifyDtos.FeedbackRequest();
+        r.setDispenseId(dispenseId);
+        r.setFeedback(text);
+        return r;
     }
 
     /* ---------- 实体构造 ---------- */

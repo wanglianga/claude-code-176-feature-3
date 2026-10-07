@@ -9,8 +9,13 @@
       </el-radio-group>
       <el-table :data="rows" stripe size="small">
         <el-table-column prop="studentName" label="学生" width="90" />
-        <el-table-column prop="schoolName" label="学校" min-width="170" />
-        <el-table-column prop="plannedDate" label="计划复查" width="120" />
+        <el-table-column prop="schoolName" label="学校" min-width="150" />
+        <el-table-column label="类型" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.kind === 'ADAPT' ? 'warning' : 'info'">{{ row.kindLabel || '周期复查' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="plannedDate" label="计划复查" width="110" />
         <el-table-column prop="actualDate" label="实际复查" width="120" />
         <el-table-column label="状态" width="100">
           <template #default="{ row }">

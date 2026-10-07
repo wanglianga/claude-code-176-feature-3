@@ -31,6 +31,18 @@ export const api = {
   intervention: (data) => http.post('/api/flow/intervention', data),
   resolveIssue: (data) => http.post('/api/flow/issue/resolve', data),
 
+  // 合作门店配镜补助：发放核验与售后
+  dispenses: (status) => http.get('/api/verify/dispenses', { params: { status } }),
+  dispenseSubmit: (data) => http.post('/api/verify/dispense', data),
+  dispenseResubmit: (id, data) => http.post(`/api/verify/dispense/${id}/resubmit`, data),
+  dispensePay: (id) => http.post(`/api/verify/dispense/${id}/pay`),
+  afterSales: (status) => http.get('/api/verify/after-sales', { params: { status } }),
+  afterSalesRegister: (data) => http.post('/api/verify/after-sales', data),
+  afterSalesSettle: (id) => http.post(`/api/verify/after-sales/${id}/settle`),
+  afterSalesFeedback: (data) => http.post('/api/verify/after-sales/feedback', data),
+  afterSalesAdjust: (id, adjustResult) =>
+    http.post(`/api/verify/after-sales/${id}/adjust`, { afterSalesId: id, adjustResult }),
+
   issues: (status) => http.get('/api/ledger/issues', { params: { status } }),
   followups: (status) => http.get('/api/ledger/followups', { params: { status } }),
   subsidies: (status) => http.get('/api/ledger/subsidies', { params: { status } }),

@@ -32,13 +32,14 @@ public class QueryService {
     private final InterventionRepository interventionRepo;
     private final IssueTrackerRepository issueRepo;
     private final HealthEventRepository eventRepo;
+    private final DispenseVerifyService verifyService;
 
     public QueryService(StudentRepository studentRepo, ScreenRecordRepository screenRepo,
                         ParentConfirmationRepository confirmRepo, SchoolReviewRepository reviewRepo,
                         VisitRecordRepository visitRepo, GlassesRecordRepository glassesRepo,
                         SubsidyApplicationRepository subsidyRepo, ReviewFollowUpRepository followupRepo,
                         InterventionRepository interventionRepo, IssueTrackerRepository issueRepo,
-                        HealthEventRepository eventRepo) {
+                        HealthEventRepository eventRepo, DispenseVerifyService verifyService) {
         this.studentRepo = studentRepo;
         this.screenRepo = screenRepo;
         this.confirmRepo = confirmRepo;
@@ -50,6 +51,7 @@ public class QueryService {
         this.interventionRepo = interventionRepo;
         this.issueRepo = issueRepo;
         this.eventRepo = eventRepo;
+        this.verifyService = verifyService;
     }
 
     @Transactional(readOnly = true)
@@ -72,6 +74,8 @@ public class QueryService {
         d.put("glasses", glassesRepo.findByStudentIdOrderByGlassesDateAscIdAsc(id).stream().map(this::glassesMap).toList());
         d.put("subsidies", subsidyRepo.findFirstByStudentIdOrderByIdDesc(id)
                 .map(a -> List.of(subsidyMap(a))).orElse(List.of()));
+        d.put("dispenses", verifyService.studentDispenses(id));
+        d.put("afterSales", verifyService.studentAfterSales(id));
         d.put("followups", followupRepo.findByStudentIdOrderByPlannedDateAscIdAsc(id).stream().map(this::followMap).toList());
         d.put("interventions", interventionRepo.findByStudentIdOrderByExecDateDescIdDesc(id)
                 .stream().map(this::interventionMap).toList());
@@ -257,6 +261,8 @@ public class QueryService {
         m.put("plannedDate", f.getPlannedDate());
         m.put("actualDate", f.getActualDate());
         m.put("status", f.getStatus());
+        m.put("kind", f.getKind() == null ? "REVIEW" : f.getKind());
+        m.put("kindLabel", "ADAPT".equals(f.getKind()) ? "适应回访" : "周期复查");
         m.put("orgName", f.getOrgName());
         m.put("visionResult", f.getVisionResult());
         m.put("remark", f.getRemark());

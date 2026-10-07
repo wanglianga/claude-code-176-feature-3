@@ -388,6 +388,13 @@ public class FlowService {
         if (latest == null) {
             throw new BusinessException("尚无配镜记录，无法申请补助");
         }
+        // 防重复申请：同一副眼镜（配镜记录）已有在办或已发放的补助时不得再次申请
+        subsidyRepo.findByGlassesIdOrderByIdDesc(latest.getId()).stream()
+                .filter(a -> a.getStatus() != SubsidyStatus.REJECTED && a.getStatus() != SubsidyStatus.RECOVERED)
+                .findFirst().ifPresent(a -> {
+                    throw new BusinessException("该配镜记录已存在补助申请（状态：" + a.getStatus().getLabel()
+                            + "），请勿重复申请");
+                });
         SubsidyApplication app = new SubsidyApplication();
         app.setStudent(s);
         app.setGlasses(latest);
@@ -419,6 +426,11 @@ public class FlowService {
                 issueCloseIfOpen(s, ScreenFlag.EXTERNAL_GLASSES, "外配眼镜凭证核验通过，补助核准");
             }
             case "PAID" -> {
+                // 防二次发放：同一副眼镜已发放过补助时拦截
+                if (app.getGlasses() != null
+                        && subsidyRepo.existsByGlassesIdAndStatus(app.getGlasses().getId(), SubsidyStatus.PAID)) {
+                    throw new BusinessException("该配镜记录已发放过补助，禁止重复发放");
+                }
                 app.setStatus(SubsidyStatus.PAID);
                 if (req.getApprovedAmount() != null) app.setApprovedAmount(req.getApprovedAmount());
                 app.setOpinion(req.getOpinion());

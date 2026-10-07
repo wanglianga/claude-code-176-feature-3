@@ -47,7 +47,7 @@ public class SecurityConfig {
                         // 前端单页 history 路由
                         .requestMatchers("/login", "/dashboard", "/students", "/students/**",
                                 "/screening", "/review", "/parent", "/visit", "/subsidy",
-                                "/followup", "/issues").permitAll()
+                                "/dispense", "/followup", "/issues").permitAll()
                         .anyRequest().authenticated())
                 .headers(h -> h.frameOptions(f -> f.sameOrigin()))
                 .exceptionHandling(eh -> eh.authenticationEntryPoint((req, resp, ex) -> {

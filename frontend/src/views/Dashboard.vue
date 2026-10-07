@@ -16,7 +16,7 @@
     </div>
 
     <el-row :gutter="12">
-      <el-col :span="4" v-for="k in kpis" :key="k.label">
+      <el-col :span="3" v-for="k in kpis" :key="k.label">
         <el-card class="kpi-card" shadow="hover">
           <div class="num" :style="{ color: k.color || '#1f6f8b' }">{{ k.value }}</div>
           <div class="label">{{ k.label }}</div>
@@ -48,7 +48,7 @@
       </el-col>
       <el-col :span="12">
         <el-card>
-          <template #header><span class="card-header-title">八类异常事项闭环情况</span></template>
+          <template #header><span class="card-header-title">异常事项闭环情况（含门店核验挂起/售后差额）</span></template>
           <div ref="issueChart" style="height:300px"></div>
         </el-card>
       </el-col>
@@ -107,7 +107,9 @@ const kpis = computed(() => [
   { label: '异常人数', value: ov.value.abnormalCount ?? '-' },
   { label: '真实复诊率', value: (ov.value.realVisitRate ?? 0) + '%', color: rateColor(ov.value.realVisitRate) },
   { label: '异常闭环率', value: (ov.value.closedLoopRate ?? 0) + '%', color: rateColor(ov.value.closedLoopRate) },
-  { label: '待处理异常事项', value: ov.value.openIssues ?? '-', color: '#e6a23c' }
+  { label: '待处理异常事项', value: ov.value.openIssues ?? '-', color: '#e6a23c' },
+  { label: '核验挂起', value: ov.value.dispenseSuspended ?? '-', color: ov.value.dispenseSuspended ? '#f56c6c' : '#67c23a' },
+  { label: '售后待办', value: ov.value.afterSalesOpen ?? '-', color: ov.value.afterSalesOpen ? '#e6a23c' : '#67c23a' }
 ])
 
 const rateColor = (v) => v >= 80 ? '#67c23a' : v >= 50 ? '#e6a23c' : '#f56c6c'

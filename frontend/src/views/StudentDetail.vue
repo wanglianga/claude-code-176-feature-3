@@ -128,8 +128,68 @@
               <el-empty v-if="!d.subsidies?.length" description="暂无补助记录" :image-size="60" />
             </el-tab-pane>
 
+            <el-tab-pane :label="`门店核验(${d.dispenses?.length || 0})`" name="dispense">
+              <div v-for="v in d.dispenses" :key="v.id" style="margin-bottom:10px">
+                <el-card shadow="never">
+                  <b>{{ v.storeName }}</b>
+                  <el-tag size="small" style="margin-left:8px"
+                          :type="{ PASSED: 'success', SUSPENDED: 'danger', PENDING: 'warning' }[v.status]">
+                    {{ v.statusLabel }}
+                  </el-tag>
+                  <el-tag v-if="v.subsidyStatus" size="small" type="warning" style="margin-left:4px">
+                    补助{{ v.subsidyStatusLabel }} {{ v.approvedAmount ?? '' }}元
+                  </el-tag>
+                  <div class="muted">
+                    实收 {{ v.totalAmount }} 元（镜片 {{ v.lensAmount }} + 镜架 {{ v.frameAmount }}）｜
+                    核定补助 {{ v.standardAmount }} 元 ｜ 凭证号 {{ v.paymentVoucherNo }} ｜
+                    取镜签收 {{ v.pickupSigned ? '已签收' : '未签收' }}
+                  </div>
+                  <div class="muted">门店处方：球 {{ v.rxSphereLeft }}/{{ v.rxSphereRight }}，柱 {{ v.rxCylinderLeft }}/{{ v.rxCylinderRight }}，轴 {{ v.rxAxisLeft }}/{{ v.rxAxisRight }}，瞳距 {{ v.pd }} ｜ {{ v.lensParams }}</div>
+                  <el-alert v-if="v.suspendReason" type="error" :closable="false" style="margin-top:4px"
+                            :title="'核验挂起：' + v.suspendReason" />
+                  <div style="margin-top:6px;font-size:12px;line-height:1.8">
+                    <div v-for="(line, i) in (v.verifyDetail || '').split('\n')" :key="i"
+                         :style="{ color: line.startsWith('×') ? '#f56c6c' : '#67c23a' }">{{ line }}</div>
+                  </div>
+                </el-card>
+              </div>
+              <el-empty v-if="!d.dispenses?.length" description="暂无门店核验记录" :image-size="60" />
+              <template v-if="d.afterSales?.length">
+                <el-divider content-position="left">售后记录（退镜/换片/换架差额与不适调整）</el-divider>
+                <el-table :data="d.afterSales" size="small" border>
+                  <el-table-column prop="handleDate" label="日期" width="100" />
+                  <el-table-column prop="typeLabel" label="类型" width="80" />
+                  <el-table-column prop="reason" label="原因/反馈" min-width="140" />
+                  <el-table-column label="原补助→新应补" width="120">
+                    <template #default="{ row }">
+                      <span v-if="row.oldSubsidy != null">{{ row.oldSubsidy }} → {{ row.newSubsidy }} 元</span>
+                      <span v-else>—</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="差额" width="90">
+                    <template #default="{ row }">
+                      <span v-if="row.difference != null"
+                            :style="{ color: row.difference < 0 ? '#f56c6c' : '#67c23a' }">
+                        {{ row.difference < 0 ? '追回' + (-row.difference) : row.difference > 0 ? '补发' + row.difference : '0' }}
+                      </span>
+                      <span v-else>—</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="statusLabel" label="状态" width="120" />
+                  <el-table-column prop="adjustResult" label="调整结果" min-width="130">
+                    <template #default="{ row }">{{ row.adjustResult || '—' }}</template>
+                  </el-table-column>
+                </el-table>
+              </template>
+            </el-tab-pane>
+
             <el-tab-pane :label="`复查计划(${d.followups?.length || 0})`" name="followup">
               <el-table :data="d.followups" size="small" border>
+                <el-table-column label="类型" width="90">
+                  <template #default="{ row }">
+                    <el-tag size="small" :type="row.kind === 'ADAPT' ? 'warning' : 'info'">{{ row.kindLabel || '周期复查' }}</el-tag>
+                  </template>
+                </el-table-column>
                 <el-table-column prop="plannedDate" label="计划日期" width="110" />
                 <el-table-column prop="actualDate" label="实际日期" width="110" />
                 <el-table-column label="状态" width="90">

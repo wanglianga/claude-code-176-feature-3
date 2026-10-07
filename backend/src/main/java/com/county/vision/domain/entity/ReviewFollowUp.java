@@ -22,6 +22,9 @@ public class ReviewFollowUp extends BaseEntity {
     /** PLANNED 待复查 / DONE 已完成 / NO_SHOW 未到场 */
     private String status;
 
+    /** REVIEW 周期复查 / ADAPT 配镜适应回访 */
+    private String kind = "REVIEW";
+
     private String orgName;
 
     /** 本次视力结果 */
