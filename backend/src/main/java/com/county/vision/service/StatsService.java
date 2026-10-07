@@ -31,6 +31,9 @@ public class StatsService {
     private final IssueTrackerRepository issueRepo;
     private final SchoolRepository schoolRepo;
     private final CacheService cache;
+    private final SubsidyVerificationRepository verificationRepo;
+    private final AfterSalesRepository afterSalesRepo;
+    private final ComfortFollowupRepository comfortRepo;
 
     @PersistenceContext
     private EntityManager em;
@@ -38,7 +41,10 @@ public class StatsService {
     public StatsService(StudentRepository studentRepo, ScreenRecordRepository screenRepo,
                         VisitRecordRepository visitRepo, GlassesRecordRepository glassesRepo,
                         SubsidyApplicationRepository subsidyRepo, IssueTrackerRepository issueRepo,
-                        SchoolRepository schoolRepo, CacheService cache) {
+                        SchoolRepository schoolRepo, CacheService cache,
+                        SubsidyVerificationRepository verificationRepo,
+                        AfterSalesRepository afterSalesRepo,
+                        ComfortFollowupRepository comfortRepo) {
         this.studentRepo = studentRepo;
         this.screenRepo = screenRepo;
         this.visitRepo = visitRepo;
@@ -47,6 +53,9 @@ public class StatsService {
         this.issueRepo = issueRepo;
         this.schoolRepo = schoolRepo;
         this.cache = cache;
+        this.verificationRepo = verificationRepo;
+        this.afterSalesRepo = afterSalesRepo;
+        this.comfortRepo = comfortRepo;
     }
 
     @Transactional(readOnly = true)
@@ -95,6 +104,15 @@ public class StatsService {
                 com.county.vision.domain.enums.SubsidyStatus.PAID));
         m.put("subsidyDispute", subsidyRepo.countByStatus(
                 com.county.vision.domain.enums.SubsidyStatus.DISPUTE));
+        // 合作门店补助发放核验
+        m.put("verificationSuspended", verificationRepo.countByStatus(
+                com.county.vision.domain.enums.VerificationStatus.SUSPENDED));
+        m.put("verificationPassed", verificationRepo.countByStatus(
+                com.county.vision.domain.enums.VerificationStatus.PASSED));
+        m.put("verificationPaid", verificationRepo.countByStatus(
+                com.county.vision.domain.enums.VerificationStatus.PAID));
+        m.put("afterSalesOpen", afterSalesRepo.findByStatusOrderByIdDesc("REQUESTED").size());
+        m.put("comfortCallbackOpen", comfortRepo.findByCallbackStatusOrderByCallbackDueDateAsc("PLANNED").size());
 
         cache.put(cacheKey, m, Duration.ofSeconds(30));
         return m;

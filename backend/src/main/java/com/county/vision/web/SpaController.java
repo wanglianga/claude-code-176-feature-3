@@ -20,6 +20,7 @@ public class SpaController {
             "/parent",
             "/visit",
             "/subsidy",
+            "/verification",
             "/followup",
             "/issues"
     })

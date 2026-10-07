@@ -23,6 +23,8 @@ const routes = [
         meta: { icon: 'FirstAidKit', roles: ['ADMIN', 'HOSPITAL', 'CLINIC', 'GOV_HEALTH'] } },
       { path: 'subsidy', name: '配镜与补助', component: () => import('../views/Subsidy.vue'),
         meta: { icon: 'Wallet', roles: ['ADMIN', 'GOV_HEALTH', 'GOV_EDU', 'HOSPITAL', 'CLINIC', 'SCHOOL_DOCTOR', 'TEACHER'] } },
+      { path: 'verification', name: '门店补助核验', component: () => import('../views/Verification.vue'),
+        meta: { icon: 'Stamp', roles: ['ADMIN', 'GOV_HEALTH', 'GOV_EDU', 'HOSPITAL', 'CLINIC'] } },
       { path: 'followup', name: '复查随访', component: () => import('../views/Followup.vue'),
         meta: { icon: 'Calendar', roles: ['ADMIN', 'HOSPITAL', 'CLINIC', 'SCHOOL_DOCTOR', 'TEACHER', 'GOV_HEALTH'] } },
       { path: 'issues', name: '异常事项台账', component: () => import('../views/Issues.vue'),

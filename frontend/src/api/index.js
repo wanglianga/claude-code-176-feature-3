@@ -35,6 +35,21 @@ export const api = {
   followups: (status) => http.get('/api/ledger/followups', { params: { status } }),
   subsidies: (status) => http.get('/api/ledger/subsidies', { params: { status } }),
 
+  // 合作门店配镜补助发放核验
+  verificationList: (status) => http.get('/api/verification', { params: { status } }),
+  verificationDetail: (id) => http.get(`/api/verification/${id}`),
+  verificationByGlasses: (glassesId) => http.get(`/api/verification/by-glasses/${glassesId}`),
+  storeGlasses: (data) => http.post('/api/verification/store-glasses', data),
+  verificationReview: (data) => http.post('/api/verification/review', data),
+  verificationPay: (id) => http.post(`/api/verification/${id}/pay`),
+  afterSalesCreate: (data) => http.post('/api/verification/after-sales', data),
+  afterSalesSettle: (data) => http.post('/api/verification/after-sales/settle', data),
+  afterSalesList: (status) => http.get('/api/verification/after-sales/list', { params: { status } }),
+  comfortFeedback: (data) => http.post('/api/verification/comfort/feedback', data),
+  comfortAdjust: (data) => http.post('/api/verification/comfort/adjust', data),
+  comfortCallback: (data) => http.post('/api/verification/comfort/callback', data),
+  comfortList: (status) => http.get('/api/verification/comfort/list', { params: { status } }),
+
   overview: (params) => http.get('/api/stats/overview', { params }),
   trendGrade: (params) => http.get('/api/stats/trend-grade', { params }),
   bySchool: (regionId) => http.get('/api/stats/by-school', { params: { regionId } }),

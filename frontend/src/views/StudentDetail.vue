@@ -106,6 +106,10 @@
                   <div class="muted">{{ g.glassesDate }} ｜ 金额 {{ g.amount }} 元 ｜ {{ g.lensInfo }}</div>
                   <el-alert v-if="g.discomfort" :type="g.discomfortResolved?'success':'error'" :closable="false"
                     :title="(g.discomfortResolved?'配镜不适已处理：':'配镜后不适：') + g.discomfortDetail" style="margin-top:4px" />
+                  <div v-if="g.paymentVoucherNo || g.pickedUp" class="muted" style="margin-top:4px">
+                    门店材料：处方号 {{ g.rxNo || '—' }} ｜ 凭证 {{ g.paymentVoucherNo || '—' }}
+                    ｜ {{ g.pickedUp ? ('已取镜签收 ' + (g.pickupDate||'') + ' ' + (g.receiverName||'')) : '未取镜签收' }}
+                  </div>
                   <el-button v-if="g.discomfort && !g.discomfortResolved" size="small" type="primary"
                              style="margin-top:6px" @click="resolveDiscomfort(g)">登记复诊调整</el-button>
                 </el-card>
@@ -114,7 +118,7 @@
             </el-tab-pane>
 
             <el-tab-pane label="补助" name="subsidy">
-              <el-descriptions v-for="a in d.subsidies" :key="a.id" :column="2" border size="small">
+              <el-descriptions v-for="a in d.subsidies" :key="a.id" :column="2" border size="small" style="margin-bottom:8px">
                 <el-descriptions-item label="状态">
                   <el-tag :type="a.status==='PAID'?'success':a.status==='DISPUTE'?'danger':a.status==='REJECTED'?'info':'warning'">
                     {{ a.statusLabel }}
@@ -126,6 +130,70 @@
                 <el-descriptions-item label="意见" :span="2">{{ a.opinion || '—' }}</el-descriptions-item>
               </el-descriptions>
               <el-empty v-if="!d.subsidies?.length" description="暂无补助记录" :image-size="60" />
+            </el-tab-pane>
+
+            <el-tab-pane :label="`门店核验·售后·回访(${d.verifications?.length || 0})`" name="verification">
+              <div v-for="v in d.verifications" :key="v.id" class="verify-card">
+                <el-card shadow="never">
+                  <div class="verify-head">
+                    <b>发放核验单 #{{ v.id }}（{{ v.opticianOrg }}，{{ v.glassesDate }}）</b>
+                    <el-tag size="small" :type="vTag(v.status)">{{ v.statusLabel }}</el-tag>
+                    <span class="muted">凭证 {{ v.paymentVoucherNo }} ｜ 应发 {{ v.payableAmount || '—' }} ｜ 实发 {{ v.paidAmount || '—' }} 元</span>
+                  </div>
+                  <div class="check-row">
+                    <el-tag v-for="c in checksOf(v)" :key="c.k" size="small"
+                            :type="c.result==='PASS'?'success':c.result==='MISSING'?'warning':c.result==='FAIL'?'danger':'info'">
+                      {{ c.label }} {{ c.txt }}
+                    </el-tag>
+                  </div>
+                  <el-alert v-if="v.holdReasons" type="error" :closable="false" style="margin-top:6px" :title="'挂起原因：' + v.holdReasons" />
+                  <pre class="verify-detail">{{ v.checkDetail }}</pre>
+                </el-card>
+              </div>
+              <el-empty v-if="!d.verifications?.length" description="暂无门店发放核验单" :image-size="60" />
+
+              <el-divider content-position="left">售后差额（与原补助连档）</el-divider>
+              <el-table :data="d.afterSales || []" size="small" border style="margin-bottom:10px">
+                <el-table-column prop="typeLabel" label="类型" width="100" />
+                <el-table-column prop="refundAmount" label="实际退款" width="90" />
+                <el-table-column prop="newCostAmount" label="新费用" width="80" />
+                <el-table-column prop="originalSubsidy" label="原补助" width="80" />
+                <el-table-column prop="recalculatedSubsidy" label="重算补助" width="90" />
+                <el-table-column label="差额" width="130">
+                  <template #default="{ row }">
+                    <el-tag size="small" :type="row.direction==='RECOVER'?'danger':row.direction==='SUPPLEMENT'?'success':'info'">
+                      {{ row.directionLabel }} {{ row.settleAmount }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="状态" width="90">
+                  <template #default="{ row }">
+                    <el-tag size="small" :type="row.status==='SETTLED'?'success':'danger'">
+                      {{ row.status==='SETTLED' ? '已结清' : '待结清' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+
+              <el-divider content-position="left">配镜不适调整与适应回访</el-divider>
+              <el-timeline>
+                <el-timeline-item v-for="c in d.comfortFollowups || []" :key="c.id"
+                                  :timestamp="(c.feedbackDate||'') + ' 反馈'">
+                  <el-tag size="small" type="danger">{{ c.discomfortTypeLabel }}</el-tag>
+                  <span style="margin-left:6px">{{ c.feedback }}</span>
+                  <div v-if="c.adjustResult" class="muted">门店调整（{{ c.adjustDate }}）：{{ c.adjustResult }}
+                    <el-tag v-if="c.reviewAdvised" size="small" type="warning" style="margin-left:6px">
+                      提醒 {{ c.reviewPlannedDate }} 前复查
+                    </el-tag>
+                  </div>
+                  <div class="muted">适应回访（应 {{ c.callbackDueDate }} 前）：
+                    {{ c.callbackDate ? c.callbackDate + ' ' + c.callbackResult : '待回访' }}
+                    <el-tag size="small" :type="c.resolved?'success':'warning'" style="margin-left:6px">
+                      {{ c.resolved ? '已适应闭环' : '跟进中' }}
+                    </el-tag>
+                  </div>
+                </el-timeline-item>
+              </el-timeline>
             </el-tab-pane>
 
             <el-tab-pane :label="`复查计划(${d.followups?.length || 0})`" name="followup">
@@ -236,10 +304,30 @@ const resolveDiscomfort = (g) => {
   }).catch(() => {})
 }
 
+const vTag = (s) => ({
+  PAID: 'success', PASSED: '', SUSPENDED: 'danger', REJECTED: 'info',
+  AFTER_SALES: 'warning', CLOSED: 'success'
+}[s])
+const CHECK_DEFS = [
+  ['studentCheck', '同一学生'], ['prescriptionCheck', '处方一致'], ['lensParamCheck', '镜片参数'],
+  ['eligibilityCheck', '家庭资格'], ['voucherCheck', '付款凭证'], ['pickupCheck', '取镜签收'],
+  ['standardCheck', '补助标准']
+]
+const checksOf = (v) => CHECK_DEFS.map(([k, label]) => ({
+  k, label, result: v[k]?.result, txt: v[k]?.label || ''
+}))
+
 onMounted(load)
 </script>
 
 <style scoped>
 .actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
 .tl { max-height: 640px; overflow-y: auto; padding-right: 6px; }
+.verify-card { margin-bottom: 10px; }
+.verify-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.check-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.verify-detail {
+  background: #f6f8fa; padding: 8px 10px; border-radius: 6px; font-size: 12px;
+  white-space: pre-wrap; line-height: 1.7; margin: 8px 0 0;
+}
 </style>

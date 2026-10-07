@@ -28,3 +28,6 @@ vision:
     enabled: ${VISION_REDIS_ENABLED:false}
   seed:
     enabled: ${VISION_SEED_ENABLED:true}
+  # 县域配镜补助标准：单副眼镜补助上限（元），发放核验收紧在该标准内；可由环境变量覆盖
+  subsidy:
+    cap: ${VISION_SUBSIDY_CAP:300}

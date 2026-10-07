@@ -5,8 +5,10 @@ import com.county.vision.domain.enums.Role;
 import com.county.vision.domain.enums.ScreenFlag;
 import com.county.vision.domain.repository.*;
 import com.county.vision.dto.RecordDtos;
+import com.county.vision.dto.VerificationDtos;
 import com.county.vision.service.FlowService;
 import com.county.vision.service.TimelineService;
+import com.county.vision.service.VerificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -38,12 +40,14 @@ public class DataSeeder implements ApplicationRunner {
     private final PasswordEncoder encoder;
     private final FlowService flow;
     private final TimelineService timeline;
+    private final VerificationService verification;
 
     public DataSeeder(UserAccountRepository userRepo, RegionRepository regionRepo,
                       SchoolRepository schoolRepo, GradeClassRepository classRepo,
                       StudentRepository studentRepo, IssueTrackerRepository issueRepo,
                       PasswordEncoder encoder,
-                      FlowService flow, TimelineService timeline) {
+                      FlowService flow, TimelineService timeline,
+                      VerificationService verification) {
         this.userRepo = userRepo;
         this.regionRepo = regionRepo;
         this.schoolRepo = schoolRepo;
@@ -53,6 +57,7 @@ public class DataSeeder implements ApplicationRunner {
         this.encoder = encoder;
         this.flow = flow;
         this.timeline = timeline;
+        this.verification = verification;
     }
 
     @Override
@@ -296,7 +301,246 @@ public class DataSeeder implements ApplicationRunner {
                 true, new BigDecimal("540.00"), "1.56镜片", false, null));
         flow.addIntervention(intervention(han.getId(), "PARENT_REMIND", d(2026, 10, 6), "提醒家长督促每日2小时户外活动"));
 
-        log.info("种子数据初始化完成：3 个片区、4 所学校、10 个角色账号、16 名学生场景样例（含 3 个已闭环样例）");
+        // ===================== 合作门店配镜补助发放核验专项场景 =====================
+
+        // ---- 17. 门店材料齐全、七项核验通过并发放（许涛） ----
+        Student xu = student(s1, grade(s1, "四年级", "1班"), "2024040117", "许涛", "男",
+                LocalDate.of(2013, 3, 21), "许爸爸", "13800020017", null, year);
+        standardChain(xu.getId(), "爱眼眼科门诊");
+        flow.submitVisit(visit(xu.getId(), "爱眼眼科门诊", "陈医生", d(2026, 10, 8),
+                true, false, "-1.50", "-1.25", "-0.50", "-0.25", "180", "175", "60",
+                "双眼低度近视", 6, true, false, null));
+        var v17 = verification.submitStoreGlasses(storeReq(xu.getId(), "爱眼门诊配镜部", d(2026, 10, 12),
+                new BigDecimal("680.00"), "V-2026-017", d(2026, 10, 12), "许爸爸",
+                "-1.50", "-1.25", "-0.50", "-0.25", "180", "175", "60",
+                null, null, null, null, null, null, null));
+        verification.payVerification(v17.getId());
+
+        // ---- 18. 门店上传处方与最近复诊处方不一致 → 挂起（杨林） ----
+        Student yang = student(s1, grade(s1, "四年级", "1班"), "2024040118", "杨林", "男",
+                LocalDate.of(2013, 5, 9), "杨妈妈", "13800020018", null, year);
+        standardChain(yang.getId(), "爱眼眼科门诊");
+        flow.submitVisit(visit(yang.getId(), "爱眼眼科门诊", "陈医生", d(2026, 10, 8),
+                true, true, "-2.00", "-1.75", "-0.75", "-0.50", "180", "180", "62",
+                "双眼中度近视", 6, true, false, null));
+        verification.submitStoreGlasses(storeReq(yang.getId(), "爱眼门诊配镜部", d(2026, 10, 13),
+                new BigDecimal("720.00"), "V-2026-018", d(2026, 10, 13), "杨妈妈",
+                // 门店上传球镜度数明显低于复诊处方（柱镜/轴位一致），判处方不一致
+                "-1.00", "-1.00", "-0.75", "-0.50", "180", "180", "62",
+                null, null, null, null, null, null, null));
+
+        // ---- 19. 镜片加工参数缺失（右眼球镜/加工瞳距未填） → 挂起（黄莉） ----
+        Student huang = student(s1, gc33, "2024030319", "黄莉", "女",
+                LocalDate.of(2014, 2, 14), "黄妈妈", "13800020019", null, year);
+        standardChain(huang.getId(), "爱眼眼科门诊");
+        flow.submitVisit(visit(huang.getId(), "爱眼眼科门诊", "陈医生", d(2026, 10, 9),
+                true, false, "-1.00", "-1.00", null, null, null, null, "58",
+                "双眼低度近视", 6, true, false, null));
+        VerificationDtos.StoreGlassesRequest h19 = storeReq(huang.getId(), "爱眼门诊配镜部", d(2026, 10, 14),
+                new BigDecimal("560.00"), "V-2026-019", d(2026, 10, 14), "黄妈妈",
+                "-1.00", "-1.00", null, null, null, null, "58",
+                null, null, null, null, null, null, null);
+        // storeReq 默认加工参数同处方；这里显式置空右眼球镜与加工瞳距，模拟门店漏填
+        h19.setLensSphereLeft("-1.00");
+        h19.setLensSphereRight(null);
+        h19.setLensPd(null);
+        verification.submitStoreGlasses(h19);
+
+        // ---- 20. 付款凭证 V-2026-001 首次使用、核验通过并发放（钱多） ----
+        Student qian = student(s1, grade(s1, "四年级", "1班"), "2024040120", "钱多", "男",
+                LocalDate.of(2013, 12, 1), "钱爸爸", "13800020020", null, year);
+        standardChain(qian.getId(), "爱眼眼科门诊");
+        flow.submitVisit(visit(qian.getId(), "爱眼眼科门诊", "陈医生", d(2026, 10, 9),
+                true, false, "-0.75", "-0.75", null, null, null, null, "59",
+                "轻度近视", 6, true, false, null));
+        var v20 = verification.submitStoreGlasses(storeReq(qian.getId(), "爱眼门诊配镜部", d(2026, 10, 15),
+                new BigDecimal("500.00"), "V-2026-001", d(2026, 10, 15), "钱爸爸",
+                "-0.75", "-0.75", null, null, null, null, "59",
+                null, null, null, null, null, null, null));
+        verification.payVerification(v20.getId());
+
+        // ---- 21. 复用付款凭证 V-2026-001 → 付款凭证重复挂起（孔秀） ----
+        Student kong = student(s1, gc33, "2024030321", "孔秀", "女",
+                LocalDate.of(2014, 4, 27), "孔妈妈", "13800020021", null, year);
+        standardChain(kong.getId(), "爱眼眼科门诊");
+        flow.submitVisit(visit(kong.getId(), "爱眼眼科门诊", "陈医生", d(2026, 10, 10),
+                true, false, "-1.25", "-1.25", null, null, null, null, "57",
+                "轻度近视", 6, true, false, null));
+        verification.submitStoreGlasses(storeReq(kong.getId(), "爱眼门诊配镜部", d(2026, 10, 16),
+                new BigDecimal("540.00"), "V-2026-001", d(2026, 10, 16), "孔妈妈",
+                "-1.25", "-1.25", null, null, null, null, "57",
+                null, null, null, null, null, null, null));
+
+        // ---- 22. 发放后家长退镜：应追回 300 元，差额待结清（曹阳） ----
+        Student cao = student(s3, g71, "2023070122", "曹阳", "男",
+                LocalDate.of(2012, 6, 18), "曹爸爸", "13800020022", null, year);
+        standardChain(cao.getId(), "爱眼眼科门诊");
+        flow.submitVisit(visit(cao.getId(), "爱眼眼科门诊", "陈医生", d(2026, 10, 9),
+                true, false, "-1.50", "-1.50", null, null, null, null, "61",
+                "低度近视", 6, true, false, null));
+        var v22 = verification.submitStoreGlasses(storeReq(cao.getId(), "爱眼门诊配镜部", d(2026, 10, 14),
+                new BigDecimal("680.00"), "V-2026-022", d(2026, 10, 14), "曹爸爸",
+                "-1.50", "-1.50", null, null, null, null, "61",
+                null, null, null, null, null, null, null));
+        verification.payVerification(v22.getId());
+        var as22 = new VerificationDtos.AfterSalesRequest();
+        as22.setGlassesId(v22.getGlasses().getId());
+        as22.setType("REFUND");
+        as22.setApplyDate(d(2026, 10, 20));
+        as22.setProcessedDate(d(2026, 10, 21));
+        as22.setRefundAmount(new BigDecimal("680.00"));
+        as22.setNewCostAmount(BigDecimal.ZERO);
+        as22.setRemark("家长带学生复查为假性近视，整副退镜");
+        verification.registerAfterSales(as22);
+
+        // ---- 23. 发放后只换片：费用上升应补发 100 元，差额当场结清（严菊） ----
+        Student yan = student(s3, g71, "2023070123", "严菊", "女",
+                LocalDate.of(2012, 10, 2), "严妈妈", "13800020023", null, year);
+        standardChain(yan.getId(), "爱眼眼科门诊");
+        flow.submitVisit(visit(yan.getId(), "爱眼眼科门诊", "陈医生", d(2026, 10, 9),
+                true, false, "-0.50", "-0.50", null, null, null, null, "58",
+                "轻度近视", 6, true, false, null));
+        var v23 = verification.submitStoreGlasses(storeReq(yan.getId(), "爱眼门诊配镜部", d(2026, 10, 13),
+                new BigDecimal("200.00"), "V-2026-023", d(2026, 10, 13), "严妈妈",
+                "-0.50", "-0.50", null, null, null, null, "58",
+                null, null, null, null, null, null, null));
+        verification.payVerification(v23.getId());
+        var as23 = new VerificationDtos.AfterSalesRequest();
+        as23.setGlassesId(v23.getGlasses().getId());
+        as23.setType("LENS_REPLACE");
+        as23.setApplyDate(d(2026, 10, 24));
+        as23.setProcessedDate(d(2026, 10, 25));
+        as23.setRefundAmount(new BigDecimal("50.00"));
+        as23.setNewCostAmount(new BigDecimal("400.00"));
+        as23.setSettledNow(true);
+        as23.setSettleVoucherNo("BL-2026-023");
+        as23.setRemark("度数变化更换镜片，旧片折退50元，新片400元");
+        verification.registerAfterSales(as23);
+
+        // ---- 24. 只更换镜架：不影响镜片补助，重算无差额并结清（华静） ----
+        Student hua = student(s4, g103, "2021100324", "华静", "女",
+                LocalDate.of(2009, 9, 25), "华爸爸", "13800020024", null, year);
+        standardChain(hua.getId(), "县人民医院配镜中心");
+        flow.submitVisit(visit(hua.getId(), "阳光县人民医院眼科", "吴医生", d(2026, 10, 9),
+                true, false, "-2.50", "-2.25", null, null, null, null, "59",
+                "中度近视", 6, true, false, null));
+        var v24 = verification.submitStoreGlasses(storeReq(hua.getId(), "县人民医院配镜中心", d(2026, 10, 14),
+                new BigDecimal("680.00"), "V-2026-024", d(2026, 10, 14), "华爸爸",
+                "-2.50", "-2.25", null, null, null, null, "59",
+                null, null, null, null, null, null, null));
+        verification.payVerification(v24.getId());
+        var as24 = new VerificationDtos.AfterSalesRequest();
+        as24.setGlassesId(v24.getGlasses().getId());
+        as24.setType("FRAME_REPLACE");
+        as24.setApplyDate(d(2026, 10, 26));
+        as24.setProcessedDate(d(2026, 10, 27));
+        as24.setRefundAmount(new BigDecimal("100.00"));
+        as24.setNewCostAmount(new BigDecimal("260.00"));
+        as24.setRemark("镜架摔变形，只更换同款镜架，镜片继续使用");
+        verification.registerAfterSales(as24);
+
+        // ---- 25. 学生反馈头晕：门店上传调整结果，建议复查，适应回访待完成（金鑫） ----
+        Student jin = student(s4, g103, "2021100325", "金鑫", "男",
+                LocalDate.of(2009, 1, 30), "金妈妈", "13800020025", null, year);
+        standardChain(jin.getId(), "县人民医院配镜中心");
+        flow.submitVisit(visit(jin.getId(), "阳光县人民医院眼科", "吴医生", d(2026, 10, 10),
+                true, true, "-1.75", "-1.50", "-0.50", "-0.25", "180", "175", "60",
+                "低度近视", 6, true, false, null));
+        var g25 = verification.submitStoreGlasses(storeReq(jin.getId(), "县人民医院配镜中心", d(2026, 10, 16),
+                new BigDecimal("640.00"), "V-2026-025", d(2026, 10, 16), "金妈妈",
+                "-1.75", "-1.50", "-0.50", "-0.25", "180", "175", "60",
+                null, null, null, null, null, null, null));
+        var fb25 = new VerificationDtos.DiscomfortFeedbackRequest();
+        fb25.setGlassesId(g25.getGlasses().getId());
+        fb25.setDiscomfortType("DIZZY");
+        fb25.setFeedbackDate(d(2026, 10, 18));
+        fb25.setFeedback("佩戴两天仍头晕，看地面有变形感");
+        var cf25 = verification.feedbackDiscomfort(fb25);
+        var ad25 = new VerificationDtos.AdjustResultRequest();
+        ad25.setFollowupId(cf25.getId());
+        ad25.setAdjustDate(d(2026, 10, 19));
+        ad25.setAdjustResult("重新核对加工瞳距无误，调整鼻托与镜腿张角，嘱先室内佩戴适应");
+        ad25.setReviewAdvised(true);
+        ad25.setReviewPlannedDate(d(2026, 11, 2));
+        verification.submitAdjustResult(ad25);
+
+        // ---- 26. 学生反馈看不清：返修镜片后适应回访确认已适应并闭环（魏强） ----
+        Student wei = student(s2, g52, "2022050226", "魏强", "男",
+                LocalDate.of(2013, 7, 7), "魏妈妈", "13800020026", null, year);
+        standardChain(wei.getId(), "爱眼眼科门诊");
+        flow.submitVisit(visit(wei.getId(), "爱眼眼科门诊", "陈医生", d(2026, 10, 10),
+                true, false, "-1.25", "-1.00", null, null, null, null, "57",
+                "低度近视", 6, true, false, null));
+        var g26 = verification.submitStoreGlasses(storeReq(wei.getId(), "爱眼门诊配镜部", d(2026, 10, 15),
+                new BigDecimal("520.00"), "V-2026-026", d(2026, 10, 15), "魏妈妈",
+                "-1.25", "-1.00", null, null, null, null, "57",
+                null, null, null, null, null, null, null));
+        var fb26 = new VerificationDtos.DiscomfortFeedbackRequest();
+        fb26.setGlassesId(g26.getGlasses().getId());
+        fb26.setDiscomfortType("BLURRY");
+        fb26.setFeedbackDate(d(2026, 10, 17));
+        fb26.setFeedback("右眼仍看不清，远视力表只到4.7");
+        var cf26 = verification.feedbackDiscomfort(fb26);
+        var ad26 = new VerificationDtos.AdjustResultRequest();
+        ad26.setFollowupId(cf26.getId());
+        ad26.setAdjustDate(d(2026, 10, 18));
+        ad26.setAdjustResult("复检发现右眼镜片装配偏差，返修更换右眼镜片");
+        ad26.setReviewAdvised(false);
+        verification.submitAdjustResult(ad26);
+        var cb26 = new VerificationDtos.CallbackRequest();
+        cb26.setFollowupId(cf26.getId());
+        cb26.setCallbackDate(d(2026, 10, 25));
+        cb26.setCallbackResult("返修后佩戴一周，双眼矫正视力5.0，无不适，已适应");
+        cb26.setResolved(true);
+        verification.submitCallback(cb26);
+
+        log.info("种子数据初始化完成：3 个片区、4 所学校、10 个角色账号、26 名学生场景样例"
+                + "（含合作门店发放核验通过/处方不一致挂起/参数缺失挂起/付款凭证重复挂起、"
+                + "退镜追回/换片补发/换架无差额售后、配镜不适调整与适应回访）");
+    }
+
+    /** 筛查→学校确认→告知→家长选择合作机构的标准前链路 */
+    private void standardChain(Long sid, String org) {
+        flow.submitScreen(screen(sid, "4.6", "4.7", "-1.25", "-1.00", null, null,
+                false, "用眼习惯一般", false, null, d(2026, 9, 16)));
+        flow.schoolReview(review(sid, "CONFIRM", "确认异常"));
+        flow.notifyParent(notify(sid, "短信", false, null));
+        flow.parentChoice(choice(sid, "PARTNER_CLINIC", org, null, null));
+    }
+
+    /** 门店四类材料上传请求；镜片加工参数传 null 时默认与处方一致 */
+    private VerificationDtos.StoreGlassesRequest storeReq(Long sid, String org, LocalDate gdate,
+                                                          BigDecimal amount, String voucher,
+                                                          LocalDate pickupDate, String receiver,
+                                                          String sl, String sr, String cl, String cr,
+                                                          String al, String ar, String pd,
+                                                          String lensSl, String lensSr, String lensCl,
+                                                          String lensCr, String lensAl, String lensAr,
+                                                          String lensPd) {
+        VerificationDtos.StoreGlassesRequest r = new VerificationDtos.StoreGlassesRequest();
+        r.setStudentId(sid);
+        r.setOpticianOrg(org);
+        r.setGlassesDate(gdate);
+        r.setAmount(amount);
+        r.setLensBrand("1.56树脂镜片");
+        r.setRxNo("RX-" + sid);
+        r.setRxSphereLeft(sl); r.setRxSphereRight(sr);
+        r.setRxCylinderLeft(cl); r.setRxCylinderRight(cr);
+        r.setRxAxisLeft(al); r.setRxAxisRight(ar); r.setRxPd(pd);
+        r.setLensSphereLeft(lensSl == null ? sl : lensSl);
+        r.setLensSphereRight(lensSr == null ? sr : lensSr);
+        r.setLensCylinderLeft(lensCl == null ? cl : lensCl);
+        r.setLensCylinderRight(lensCr == null ? cr : lensCr);
+        r.setLensAxisLeft(lensAl == null ? al : lensAl);
+        r.setLensAxisRight(lensAr == null ? ar : lensAr);
+        r.setLensPd(lensPd == null ? pd : lensPd);
+        r.setPaymentVoucherNo(voucher);
+        r.setPaymentVoucherFile(voucher + ".jpg");
+        r.setPickedUp(true);
+        r.setPickupDate(pickupDate);
+        r.setReceiverName(receiver);
+        r.setPickupRemark("家长现场签字签收");
+        return r;
     }
 
     /** 闭环某学生当前未处理的指定类型异常事项 */

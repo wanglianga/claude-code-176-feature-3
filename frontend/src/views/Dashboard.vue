@@ -48,7 +48,7 @@
       </el-col>
       <el-col :span="12">
         <el-card>
-          <template #header><span class="card-header-title">八类异常事项闭环情况</span></template>
+          <template #header><span class="card-header-title">各类异常事项闭环情况（含核验挂起/售后差额/适应回访）</span></template>
           <div ref="issueChart" style="height:300px"></div>
         </el-card>
       </el-col>
@@ -107,7 +107,13 @@ const kpis = computed(() => [
   { label: '异常人数', value: ov.value.abnormalCount ?? '-' },
   { label: '真实复诊率', value: (ov.value.realVisitRate ?? 0) + '%', color: rateColor(ov.value.realVisitRate) },
   { label: '异常闭环率', value: (ov.value.closedLoopRate ?? 0) + '%', color: rateColor(ov.value.closedLoopRate) },
-  { label: '待处理异常事项', value: ov.value.openIssues ?? '-', color: '#e6a23c' }
+  { label: '待处理异常事项', value: ov.value.openIssues ?? '-', color: '#e6a23c' },
+  { label: '门店核验挂起', value: ov.value.verificationSuspended ?? 0, color: '#f56c6c' },
+  { label: '核验通过待发放', value: ov.value.verificationPassed ?? 0, color: '#e6a23c' },
+  { label: '补助已发放(笔)', value: ov.value.verificationPaid ?? 0, color: '#67c23a' },
+  { label: '售后差额待结清', value: ov.value.afterSalesOpen ?? 0, color: '#f56c6c' },
+  { label: '配镜适应待回访', value: ov.value.comfortCallbackOpen ?? 0, color: '#e6a23c' },
+  { label: '补助争议中', value: ov.value.subsidyDispute ?? '-', color: '#909399' }
 ])
 
 const rateColor = (v) => v >= 80 ? '#67c23a' : v >= 50 ? '#e6a23c' : '#f56c6c'
